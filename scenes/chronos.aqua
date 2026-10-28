@@ -1,0 +1,108 @@
+# Particle Clock: the current time (from hour(), minute() and second()) spelled in dot-matrix digits by sprung
+# particles that scatter and regroup every time a digit changes. In the spirit of OpenProcessing's particle clocks.
+var P = import("Processing");
+var A = import("Array");
+var title = "Particle Clock";
+var titleZh = "粒子時鐘";
+var idea = "hour() · minute() · second() · 900 sprung particles";
+var renderer = 2;
+
+# 5 x 7 dot-matrix digits, row by row.
+var GLYPHS = ["01110100011001110101110011000101110", "00100011000010000100001000010001110", "01110100010000100010001000100011111",
+              "11110000010000101110000010000111110", "00010001100101010010111110001000010", "11111100001111000001000011000101110",
+              "01110100001000011110100011000101110", "11111000010001000100010000100001000", "01110100011000101110100011000101110",
+              "01110100011000101111000010000101110"];
+struct Dot { x; y; vx; vy; tx; ty; hue; size }
+var dots = [];
+var W = 0.0d;
+var H = 0.0d;
+var base = 0;
+var shown = "";
+var done = 0;
+
+var setup = function(g) {
+    W = g.width * 1.0d;
+    H = g.height * 1.0d;
+    base = P.hour() * 3600 + P.minute() * 60 + P.second();
+    P.randomSeed(12);
+    dots = [];
+    for (var i = 0; i < 900; i++) {
+        A.Append(dots, Dot(P.random(W), P.random(H), 0.0d, 0.0d, P.random(W), P.random(H), P.random(1), P.random(2.0d, 4.5d)));
+    }
+    shown = "";
+    done = 0;
+};
+
+# The lit cells of "HH:MM:SS" (digits and colons) as targets; every lit cell takes several particles.
+var place = function(text) {
+    var cell = P.min(W / 52.0d, H / 14.0d);
+    var left = (W - 47 * cell) / 2;
+    var top = (H - 7 * cell) / 2;
+    var targets = [];
+    var column = 0;
+    for (var c = 0; c < len(text); c++) {
+        var ch = text[c];
+        if (ch == ":") {
+            A.Append(targets, [left + (column + 0.5d) * cell, top + 2 * cell]);
+            A.Append(targets, [left + (column + 0.5d) * cell, top + 4 * cell]);
+            column += 2;
+        } else {
+            var glyph = GLYPHS[int(P.unhex(ch))];
+            for (var r = 0; r < 7; r++) {
+                for (var k = 0; k < 5; k++) {
+                    if (glyph[r * 5 + k] == "1") { A.Append(targets, [left + (column + k) * cell, top + r * cell]); }
+                }
+            }
+            column += 6;
+        }
+    }
+    for (var i = 0; i < len(dots); i++) {
+        var d = dots[i];
+        var spot = targets[i % len(targets)];
+        var jitter = P.min(cell * 0.32d, 9.0d);
+        var nx = spot[0] + P.random(-jitter, jitter);
+        var ny = spot[1] + P.random(-jitter, jitter);
+        if (P.dist(nx, ny, d.tx, d.ty) > cell) {
+            # Moving to another cell: a kick outwards first, so the change explodes before it regroups.
+            var a = P.random(P.TWO_PI);
+            d.vx += P.cos(a) * 9;
+            d.vy += P.sin(a) * 9;
+        }
+        d.tx = nx;
+        d.ty = ny;
+    }
+};
+
+var draw = function(g, t) {
+    var now = base + int(t);
+    var text = P.nf(int(now / 3600) % 24, 2) + ":" + P.nf(int(now / 60) % 60, 2) + ":" + P.nf(now % 60, 2);
+    if (text != shown) { shown = text; place(text); }
+    var target = int(t * 60);
+    for (var k = done; k < target; k++) {
+        for (var i = 0; i < len(dots); i++) {
+            var d = dots[i];
+            d.vx = (d.vx + (d.tx - d.x) * 0.045d) * 0.86d;
+            d.vy = (d.vy + (d.ty - d.y) * 0.045d) * 0.86d;
+            d.x += d.vx;
+            d.y += d.vy;
+        }
+    }
+    done = target;
+    g.noStroke();
+    g.fill(6, 6, 18, 90);
+    g.rect(0, 0, W, H);
+    g.blendMode(P.ADD);
+    g.colorMode(P.HSB, 1.0d);
+    var sweep = t * 0.08d;
+    for (var i = 0; i < len(dots); i++) {
+        var d = dots[i];
+        var speed = P.min(1.0d, P.sqrt(d.vx * d.vx + d.vy * d.vy) / 8.0d);
+        var hue = (0.5d + d.x / W * 0.4d + sweep + d.hue * 0.06d) % 1.0d;
+        g.fill(hue, 0.55d + speed * 0.4d, 1.0d, 0.18d);
+        g.circle(d.x, d.y, d.size * 4.5d);
+        g.fill(hue, 0.3d, 1.0d, 0.9d);
+        g.circle(d.x, d.y, d.size);
+    }
+    g.colorMode(P.RGB, 255);
+    g.blendMode(P.BLEND);
+};

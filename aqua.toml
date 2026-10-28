@@ -1,0 +1,15 @@
+manifest_version = 2
+
+[project]
+name = "ProcessingShowcase"
+version = "1.0.0"
+entry = "main.aqua"
+sources = [
+    "main.aqua",
+    "scenes/nebula.aqua", "scenes/wormhole.aqua", "scenes/constellation.aqua", "scenes/hanabi.aqua",
+    "scenes/orbits.aqua", "scenes/weave.aqua", "scenes/sakura.aqua", "scenes/julia.aqua", "scenes/chronos.aqua",
+    "scenes/tentacles.aqua", "scenes/harmonograph.aqua", "scenes/ridgelines.aqua", "scenes/divide.aqua"
+]
+platforms = ["windows", "linux", "web", "android"]
+
+[dependencies]

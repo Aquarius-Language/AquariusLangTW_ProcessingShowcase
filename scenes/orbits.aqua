@@ -1,0 +1,62 @@
+# Orbit Sphere: 900 lit cubes on a Fibonacci sphere breathe with travelling waves while two colored point lights
+# circle them. In the spirit of OpenProcessing's sphere-of-points sketches.
+var P = import("Processing");
+var A = import("Array");
+var title = "Orbit Sphere";
+var titleZh = "環繞星球";
+var idea = "P3D · 900 lit boxes · Fibonacci sphere · orbiting point lights";
+var renderer = 3;
+
+var COUNT = 900;
+var W = 0.0d;
+var H = 0.0d;
+var theta = [];
+var phi = [];
+
+var setup = function(g) {
+    W = g.width * 1.0d;
+    H = g.height * 1.0d;
+    theta = [];
+    phi = [];
+    var golden = P.PI * (3.0d - P.sqrt(5.0d));
+    for (var i = 0; i < COUNT; i++) {
+        var y = 1.0d - (i + 0.5d) / COUNT * 2.0d;
+        A.Append(theta, golden * i);
+        A.Append(phi, P.acos(y));
+    }
+};
+
+var draw = function(g, t) {
+    g.background(5, 6, 18);
+    g.noStroke();
+    g.ambientLight(30, 30, 50);
+    var la = t * 0.9d;
+    g.pointLight(255, 80, 160, P.cos(la) * 700 + W / 2, -200 + H / 2, P.sin(la) * 700);
+    g.pointLight(60, 200, 255, P.cos(la + P.PI) * 700 + W / 2, 250 + H / 2, P.sin(la + P.PI) * 700);
+    g.directionalLight(120, 120, 140, 0, 0, -1);
+    g.specular(255, 255, 255);
+    g.shininess(24);
+    g.pushMatrix();
+    g.translate(W / 2, H / 2, -60);
+    g.rotateY(t * 0.25d);
+    g.rotateX(0.35d + P.sin(t * 0.2d) * 0.2d);
+    var base = H * 0.36d;
+    for (var i = 0; i < COUNT; i++) {
+        var th = theta[i];
+        var ph = phi[i];
+        var sx = P.sin(ph) * P.cos(th);
+        var sy = P.cos(ph);
+        var sz = P.sin(ph) * P.sin(th);
+        var wave = P.sin(ph * 6.0d - t * 2.4d) * 0.5d + P.sin(th * 3.0d + t * 1.3d) * 0.5d;
+        var r = base * (1.0d + wave * 0.12d);
+        g.pushMatrix();
+        g.translate(sx * r, sy * r, sz * r);
+        g.rotateY(th);
+        g.rotateX(ph);
+        g.fill(150 + 100 * wave, 160, 230 - 60 * wave);
+        g.box(7.0d + 9.0d * (wave * 0.5d + 0.5d), 7.0d, 7.0d + 22.0d * (wave * 0.5d + 0.5d));
+        g.popMatrix();
+    }
+    g.popMatrix();
+    g.noLights();
+};

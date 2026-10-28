@@ -1,0 +1,126 @@
+# Hanabi Night: rockets climb, burst into peonies, rings, willows and crackling stars, and rain down with gravity and
+# drag over a city skyline. In the spirit of OpenProcessing's fireworks (hanabi) sketches.
+var P = import("Processing");
+var A = import("Array");
+var title = "Hanabi Night";
+var titleZh = "夏夜花火";
+var idea = "4,000-spark pool · gravity, drag, flicker · four burst shapes";
+var renderer = 2;
+
+struct Spark { alive; x; y; vx; vy; life; maxLife; hue; kind; trail }
+var sparks = [];
+var cursor = 0;
+var W = 0.0d;
+var H = 0.0d;
+var done = 0;
+var skyline = [];
+
+var setup = function(g) {
+    W = g.width * 1.0d;
+    H = g.height * 1.0d;
+    P.randomSeed(8);
+    sparks = [];
+    for (var i = 0; i < 4000; i++) { A.Append(sparks, Spark(false, 0.0d, 0.0d, 0.0d, 0.0d, 0.0d, 1.0d, 0.0d, 0, false)); }
+    skyline = [];
+    var x = 0.0d;
+    for (var i = 0; i < 80 && x < W; i++) {
+        var w = P.random(30, 90);
+        A.Append(skyline, [x, w, P.random(40, 170)]);
+        x += w;
+    }
+    done = -100; # start mid-show: the first frame runs 100 steps
+    g.background(4, 3, 16);
+};
+
+var emit = function(x, y, vx, vy, life, hue, kind, trail) {
+    for (var k = 0; k < len(sparks); k++) {
+        cursor = (cursor + 1) % len(sparks);
+        var s = sparks[cursor];
+        if (!s.alive) {
+            s.alive = true; s.x = x; s.y = y; s.vx = vx; s.vy = vy; s.life = life; s.maxLife = life; s.hue = hue; s.kind = kind; s.trail = trail;
+            return s;
+        }
+    }
+    return sparks[cursor];
+};
+
+var burst = function(s) {
+    var shape = int(P.random(4));
+    var count = 220;
+    for (var i = 0; i < count; i++) {
+        var a = P.random(P.TWO_PI);
+        var speed = P.random(1.5d, 6.8d);
+        if (shape == 1) { speed = 6.2d + P.random(0.3d); }
+        var hue = (s.hue + P.random(-0.04d, 0.04d) + 1.0d) % 1.0d;
+        if (shape == 3 && i % 2 == 0) { hue = (s.hue + 0.5d) % 1.0d; }
+        var life = P.random(60, 110);
+        if (shape == 2) { life = P.random(120, 190); speed *= 0.8d; }
+        emit(s.x, s.y, P.cos(a) * speed, P.sin(a) * speed, life, hue, 1 + shape, shape == 2);
+    }
+};
+
+var step = function() {
+    if (P.random(1) < 0.055d) {
+        emit(P.random(W * 0.15d, W * 0.85d), H, P.random(-1.2d, 1.2d), -P.random(9.5d, 13.0d), P.random(55, 75), P.random(1), 0, true);
+    }
+    for (var i = 0; i < len(sparks); i++) {
+        var s = sparks[i];
+        if (s.alive) {
+            s.vy += 0.07d;
+            if (s.kind != 0) { s.vx *= 0.975d; s.vy *= 0.975d; }
+            if (s.kind == 3) { s.vy += 0.015d; }
+            s.x += s.vx;
+            s.y += s.vy;
+            s.life -= 1;
+            if (s.life <= 0) {
+                s.alive = false;
+                if (s.kind == 0) { burst(s); }
+            } else if (s.kind == 0 && s.trail && P.random(1) < 0.6d) {
+                emit(s.x, s.y, P.random(-0.3d, 0.3d), P.random(0.5d, 1.5d), 25, 0.09d, 5, false);
+            }
+        }
+    }
+};
+
+var draw = function(g, t) {
+    var target = int(t * 60);
+    for (var k = done; k < target; k++) { step(); }
+    done = target;
+    g.noStroke();
+    g.fill(4, 3, 16, 46);
+    g.rect(0, 0, W, H);
+    g.blendMode(P.ADD);
+    g.colorMode(P.HSB, 1.0d);
+    for (var i = 0; i < len(sparks); i++) {
+        var s = sparks[i];
+        if (s.alive) {
+            var fade = s.life / s.maxLife;
+            var flicker = 1.0d;
+            if (s.kind == 4 && P.random(1) < 0.35d) { flicker = 0.0d; }
+            if (s.kind == 0) {
+                g.stroke(0.1d, 0.4d, 1.0d, 0.9d);
+                g.strokeWeight(3);
+                g.line(s.x, s.y, s.x - s.vx * 2.5d, s.y - s.vy * 2.5d);
+            } else {
+                g.stroke(s.hue, 0.85d - fade * 0.45d, 1.0d, P.min(1.0d, fade * 1.6d) * flicker);
+                g.strokeWeight(1.4d + fade * 3.2d);
+                g.line(s.x, s.y, s.x - s.vx * 3.0d, s.y - s.vy * 3.0d);
+            }
+        }
+    }
+    g.colorMode(P.RGB, 255);
+    g.blendMode(P.BLEND);
+    # The skyline and its lit windows.
+    g.noStroke();
+    for (var i = 0; i < len(skyline); i++) {
+        var b = skyline[i];
+        g.fill(8, 8, 20);
+        g.rect(b[0], H - b[2], b[1] - 4, b[2]);
+        g.fill(255, 210, 120, 120);
+        for (var wy = H - b[2] + 10; wy < H - 12; wy += 16) {
+            for (var wx = b[0] + 6; wx < b[0] + b[1] - 12; wx += 12) {
+                if (P.noise(wx * 0.3d, wy * 0.3d) > 0.62d) { g.rect(wx, wy, 4, 7); }
+            }
+        }
+    }
+};

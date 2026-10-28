@@ -1,0 +1,66 @@
+# Ridgelines: a noise terrain sliced into glowing ridge lines rolls toward the viewer in P3D; dark filled strips under
+# each line hide the ridges behind it, like a pulsar plot over a moonlit valley. In the spirit of OpenProcessing's
+# line-landscape sketches.
+var P = import("Processing");
+var title = "Ridgelines";
+var titleZh = "山脊光譜";
+var idea = "P3D noise terrain · hidden-line ridges · QUAD_STRIP";
+var renderer = 3;
+
+var ROWS = 48;
+var POINTS = 90;
+var SPACING = 36.0d;
+var W = 0.0d;
+var H = 0.0d;
+
+var setup = function(g) {
+    W = g.width * 1.0d;
+    H = g.height * 1.0d;
+    P.noiseSeed(23);
+};
+
+var height = function(x, row) {
+    var n = P.noise(x * 0.0042d + 10, row * 0.11d);
+    var ridge = 1.0d - P.abs(P.noise(x * 0.0021d, row * 0.05d) * 2.0d - 1.0d);
+    var center = P.exp(-P.sq(x / (W * 0.33d)));
+    return (n * 150.0d + ridge * ridge * 330.0d) * (0.35d + center * 0.9d);
+};
+
+var draw = function(g, t) {
+    g.background(4, 4, 12);
+    var scroll = t * 4.0d;
+    var first = P.floor(scroll);
+    var offset = (scroll - first) * SPACING;
+    g.pushMatrix();
+    g.translate(W / 2, H * 0.92d, -120);
+    g.rotateX(-0.5d);
+    g.colorMode(P.HSB, 1.0d);
+    var span = W * 1.6d;
+    for (var r = 0; r < ROWS; r++) {
+        var row = first + ROWS - r;
+        var z = -(ROWS - r) * SPACING + offset;
+        var fade = P.constrain(r / (ROWS * 0.6d), 0, 1);
+        # The strip hiding what lies behind this ridge.
+        g.noStroke();
+        g.fill(0, 0, 0.02d, 1.0d);
+        g.beginShape(P.QUAD_STRIP);
+        for (var i = 0; i < POINTS; i++) {
+            var x = -span / 2 + span * i / (POINTS - 1.0d);
+            g.vertex(x, -height(x, row), z);
+            g.vertex(x, 40, z);
+        }
+        g.endShape();
+        # The ridge itself, lifted a hair in front of its strip.
+        g.noFill();
+        g.strokeWeight(1.0d + fade * 1.6d);
+        g.stroke((0.5d + row * 0.012d + t * 0.02d) % 1.0d, 0.7d, 1.0d, fade);
+        g.beginShape();
+        for (var i = 0; i < POINTS; i++) {
+            var x = -span / 2 + span * i / (POINTS - 1.0d);
+            g.vertex(x, -height(x, row) - 0.5d, z + 0.5d);
+        }
+        g.endShape();
+    }
+    g.popMatrix();
+    g.colorMode(P.RGB, 255);
+};

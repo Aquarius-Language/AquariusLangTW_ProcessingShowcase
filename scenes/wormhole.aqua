@@ -1,0 +1,85 @@
+# Neon Wormhole: twisted polygon rings rush toward the camera along a winding path, stitched together by longitudinal
+# rails and passing sparks. In the spirit of OpenProcessing's tunnel sketches.
+var P = import("Processing");
+var title = "Neon Wormhole";
+var titleZh = "霓虹蟲洞";
+var idea = "P3D rings · additive glow with hint(DISABLE_DEPTH_TEST)";
+var renderer = 3;
+
+var RINGS = 30;
+var SIDES = 7;
+var SPACING = 110.0d;
+var RADIUS = 520.0d;
+var W = 0.0d;
+var H = 0.0d;
+
+var setup = function(g) {
+    W = g.width * 1.0d;
+    H = g.height * 1.0d;
+};
+
+# Where the tunnel's center line is at depth z (the path winds while the camera flies through it).
+var bendX = function(z, t) { return P.sin(z * 0.0021d + t * 0.9d) * 170.0d; };
+var bendY = function(z, t) { return P.cos(z * 0.0017d + t * 0.6d) * 120.0d; };
+
+var draw = function(g, t) {
+    g.background(2, 0, 9);
+    g.hint(P.DISABLE_DEPTH_TEST);
+    g.blendMode(P.ADD);
+    g.colorMode(P.HSB, 1.0d);
+    g.noFill();
+    g.pushMatrix();
+    g.translate(W / 2, H / 2, 0);
+    var travel = t * 260.0d;
+    var offset = travel % SPACING;
+    var first = int(travel / SPACING);
+    for (var q = 0; q < RINGS; q++) {
+        var r = RINGS - 1 - q;
+        var z = -r * SPACING + offset;
+        var index = first - r;
+        var fade = P.constrain(1.0d - r / (RINGS * 1.0d), 0, 1);
+        var twist = index * 0.13d + t * 0.35d;
+        var hue = (index * 0.031d + t * 0.05d + 10.0d) % 1.0d;
+        var x = bendX(z - travel, t) - bendX(-travel, t);
+        var y = bendY(z - travel, t) - bendY(-travel, t);
+        var nextZ = z - SPACING;
+        var nx = bendX(nextZ - travel, t) - bendX(-travel, t);
+        var ny = bendY(nextZ - travel, t) - bendY(-travel, t);
+        g.strokeWeight(2.5d + fade * 3.0d);
+        g.stroke(hue, 0.8d, 1.0d, fade * fade);
+        g.beginShape();
+        for (var k = 0; k < SIDES; k++) {
+            var a = twist + k * P.TWO_PI / SIDES;
+            g.vertex(x + P.cos(a) * RADIUS, y + P.sin(a) * RADIUS, z + 120);
+        }
+        g.endShape(P.CLOSE);
+        # Rails to the next ring, and a dot at every corner.
+        g.strokeWeight(1.2d);
+        g.stroke((hue + 0.5d) % 1.0d, 0.6d, 1.0d, fade * 0.5d);
+        for (var k = 0; k < SIDES; k++) {
+            var a = twist + k * P.TWO_PI / SIDES;
+            var b = twist + 0.13d + k * P.TWO_PI / SIDES;
+            g.line(x + P.cos(a) * RADIUS, y + P.sin(a) * RADIUS, z + 120, nx + P.cos(b) * RADIUS, ny + P.sin(b) * RADIUS, nextZ + 120);
+        }
+        g.strokeWeight(7.0d * fade + 1.0d);
+        g.stroke(hue, 0.25d, 1.0d, fade);
+        for (var k = 0; k < SIDES; k++) {
+            var a = twist + k * P.TWO_PI / SIDES;
+            g.point(x + P.cos(a) * RADIUS, y + P.sin(a) * RADIUS, z + 120);
+        }
+    }
+    # Sparks streaming past.
+    P.randomSeed(3);
+    g.strokeWeight(2);
+    for (var s = 0; s < 140; s++) {
+        var angle = P.random(P.TWO_PI);
+        var radius = P.random(40, RADIUS * 0.9d);
+        var depth = (P.random(SPACING * RINGS) + travel * 2.2d) % (SPACING * RINGS) - SPACING * RINGS + 200;
+        g.stroke(P.random(1), 0.3d, 1.0d, 0.8d);
+        g.line(P.cos(angle) * radius, P.sin(angle) * radius, depth + 120, P.cos(angle) * radius, P.sin(angle) * radius, depth + 60);
+    }
+    g.popMatrix();
+    g.colorMode(P.RGB, 255);
+    g.blendMode(P.BLEND);
+    g.hint(P.ENABLE_DEPTH_TEST);
+};

@@ -1,0 +1,87 @@
+# Divide: the canvas splits recursively into panels whose dividing lines slide back and forth, each leaf filled with a
+# small pattern (stripes, rings, dots or a quarter disc) from a five-color palette. In the spirit of OpenProcessing's
+# recursive subdivision sketches.
+var P = import("Processing");
+var title = "Divide";
+var titleZh = "分割構成";
+var idea = "recursive subdivision · sliding splits · pattern tiles";
+var renderer = 2;
+
+var PALETTE = [];
+var W = 0.0d;
+var H = 0.0d;
+
+var setup = function(g) {
+    W = g.width * 1.0d;
+    H = g.height * 1.0d;
+    PALETTE = [g.color(244, 236, 220), g.color(234, 84, 85), g.color(45, 64, 89), g.color(240, 180, 60), g.color(80, 170, 160)];
+};
+
+var pattern = function(g, x, y, w, h, id, t) {
+    var a = PALETTE[id % 5];
+    var b = PALETTE[(id * 3 + 1) % 5];
+    g.noStroke();
+    g.fill(a);
+    g.rect(x, y, w, h);
+    g.fill(b);
+    var kind = id % 4;
+    var m = P.min(w, h);
+    if (kind == 0) {
+        # Stripes sliding through the panel.
+        var gap = P.max(8, m / 6);
+        var shift = (t * 30.0d) % (gap * 2);
+        g.clip(x, y, w, h);
+        for (var s = -gap * 2 + shift; s < w + h; s += gap * 2) {
+            g.quad(x + s, y, x + s + gap, y, x + s + gap - h, y + h, x + s - h, y + h);
+        }
+        g.noClip();
+    } else if (kind == 1) {
+        # Pulsing concentric rings.
+        g.noFill();
+        g.stroke(b);
+        g.strokeWeight(P.max(2, m / 22));
+        for (var r = 1; r < 5; r++) { g.circle(x + w / 2, y + h / 2, m * (r / 5.0d) * (0.85d + 0.15d * P.sin(t * 2 + r))); }
+    } else if (kind == 2) {
+        # A grid of dots breathing in a wave.
+        var step = P.max(12, m / 4);
+        for (var dx = step / 2; dx < w; dx += step) {
+            for (var dy = step / 2; dy < h; dy += step) {
+                g.circle(x + dx, y + dy, step * (0.35d + 0.25d * P.sin(t * 3 + (x + dx + y + dy) * 0.02d)));
+            }
+        }
+    } else {
+        # A quarter disc turning in its corner.
+        g.clip(x, y, w, h);
+        g.pushMatrix();
+        g.translate(x, y);
+        g.arc(0, 0, m * 2, m * 2, t * 0.5d, t * 0.5d + P.HALF_PI, P.PIE);
+        g.popMatrix();
+        g.noClip();
+    }
+};
+
+var split = function(g, x, y, w, h, depth, id, t) {
+    if (depth == 0 || w < 50 || h < 50) {
+        pattern(g, x, y, w, h, id, t);
+        g.noFill();
+        g.stroke(20, 20, 30);
+        g.strokeWeight(4);
+        g.rect(x, y, w, h);
+        return 0;
+    }
+    # Each node's split position oscillates smoothly between 30% and 70%.
+    var ratio = 0.5d + 0.2d * P.sin(t * (0.4d + (id % 7) * 0.09d) + id * 1.7d);
+    if ((w > h) == (id % 3 != 0)) {
+        split(g, x, y, w * ratio, h, depth - 1, id * 2 + 1, t);
+        split(g, x + w * ratio, y, w * (1 - ratio), h, depth - 1, id * 2 + 2, t);
+    } else {
+        split(g, x, y, w, h * ratio, depth - 1, id * 2 + 1, t);
+        split(g, x, y + h * ratio, w, h * (1 - ratio), depth - 1, id * 2 + 2, t);
+    }
+    return 0;
+};
+
+var draw = function(g, t) {
+    g.background(20, 20, 30);
+    split(g, 12, 12, W - 24, H - 24, 6, 0, t);
+};

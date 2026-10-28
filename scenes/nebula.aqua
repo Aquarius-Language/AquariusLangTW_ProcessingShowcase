@@ -1,0 +1,70 @@
+# Nebula Currents: thousands of motes ride a slowly turning Perlin flow field and leave additive, color-shifting trails.
+# In the spirit of OpenProcessing's flow-field particle sketches.
+var P = import("Processing");
+var A = import("Array");
+var title = "Nebula Currents";
+var titleZh = "星雲流場";
+var idea = "Perlin flow field · thousands of motes · additive trails";
+var renderer = 2;
+
+struct Mote { x; y; px; py; life; tint }
+var motes = [];
+var W = 0.0d;
+var H = 0.0d;
+
+var respawn = function(m) {
+    m.x = P.random(W); m.y = P.random(H); m.px = m.x; m.py = m.y; m.life = P.random(80, 320);
+};
+
+var setup = function(g) {
+    W = g.width * 1.0d;
+    H = g.height * 1.0d;
+    P.randomSeed(11);
+    P.noiseSeed(5);
+    P.noiseDetail(4, 0.5d);
+    motes = [];
+    # About 4,000 motes per 1280x720 window, more on larger canvases so the field looks as dense.
+    var count = int(P.min(9000, 4000.0d * W * H / 921600.0d));
+    for (var i = 0; i < count; i++) {
+        var m = Mote(0.0d, 0.0d, 0.0d, 0.0d, 0.0d, P.random(1));
+        respawn(m);
+        A.Append(motes, m);
+    }
+    g.background(3, 4, 14);
+};
+
+var draw = function(g, t) {
+    # A translucent veil each frame turns the strokes into fading trails.
+    g.noStroke();
+    g.fill(3, 4, 14, 16);
+    g.rect(0, 0, W, H);
+    g.blendMode(P.ADD);
+    g.colorMode(P.HSB, 1.0d);
+    g.strokeWeight(1.4d);
+    g.strokeCap(P.SQUARE);
+    var z = t * 0.09d;
+    var swirl = 2.2d + P.sin(t * 0.21d) * 0.6d;
+    var cx = W / 2 + P.cos(t * 0.3d) * W * 0.25d;
+    var cy = H / 2 + P.sin(t * 0.23d) * H * 0.2d;
+    for (var i = 0; i < len(motes); i++) {
+        var m = motes[i];
+        var angle = P.noise(m.x * 0.0016d, m.y * 0.0016d, z) * P.TWO_PI * swirl;
+        # A drifting vortex bends the field around a moving eye.
+        var dx = m.x - cx;
+        var dy = m.y - cy;
+        var pull = 9000.0d / (dx * dx + dy * dy + 9000.0d);
+        angle += pull * 2.4d;
+        m.px = m.x;
+        m.py = m.y;
+        m.x += P.cos(angle) * 2.1d;
+        m.y += P.sin(angle) * 2.1d;
+        m.life -= 1;
+        var hue = (0.55d + 0.3d * P.sin(angle * 0.5d + t * 0.17d) + m.tint * 0.15d + pull * 0.35d + 1.0d) % 1.0d;
+        g.stroke(hue, 0.75d - pull * 0.5d, 1.0d, 0.32d);
+        g.line(m.px, m.py, m.x, m.y);
+        if (m.life < 0 || m.x < 0 || m.y < 0 || m.x > W || m.y > H) { respawn(m); }
+    }
+    g.colorMode(P.RGB, 255);
+    g.strokeCap(P.ROUND);
+    g.blendMode(P.BLEND);
+};

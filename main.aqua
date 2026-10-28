@@ -1,0 +1,101 @@
+# AquariusLang Processing Showcase: thirteen animated sketches in the spirit of OpenProcessing favourites, each its own
+# module in scenes/. ←/→ switch sketches, Space pauses the autoplay, R restarts the sketch, S saves a PNG, Esc quits.
+# 星泉 Processing 展示：十三個動態草稿，← → 切換，空白鍵暫停自動播放，R 重新開始，S 存檔，Esc 離開。
+var P = import("Processing");
+var scenes = [
+    import("scenes/nebula.aqua"), import("scenes/wormhole.aqua"), import("scenes/constellation.aqua"),
+    import("scenes/hanabi.aqua"), import("scenes/orbits.aqua"), import("scenes/weave.aqua"),
+    import("scenes/sakura.aqua"), import("scenes/julia.aqua"), import("scenes/chronos.aqua"),
+    import("scenes/tentacles.aqua"), import("scenes/harmonograph.aqua"), import("scenes/ridgelines.aqua"),
+    import("scenes/divide.aqua")
+];
+var SCENE_SECONDS = 14.0d;
+var flat = 0;
+var deep = 0;
+var current = 0;
+var started = 0.0d;
+var autoplay = true;
+var saveNext = false;
+var font = 0;
+
+# Each scene draws into an offscreen canvas of its renderer (P2D or P3D) at the window's pixel density.
+var canvasFor = function(scene) {
+    if (scene.renderer == 3) { return deep; }
+    return flat;
+};
+var fitCanvases = function() {
+    if (flat.width != P.width || flat.height != P.height || flat.pixelWidth != P.pixelWidth) {
+        flat.resize(P.width, P.height, P.pixelWidth, P.pixelHeight);
+        deep.resize(P.width, P.height, P.pixelWidth, P.pixelHeight);
+        return true;
+    }
+    return false;
+};
+var resetStyle = function(g) {
+    g.resetShader(); g.noLights(); g.blendMode(P.BLEND); g.colorMode(P.RGB, 255); g.noTint();
+    g.strokeWeight(1); g.stroke(0); g.fill(255); g.strokeCap(P.ROUND); g.strokeJoin(P.MITER);
+    g.rectMode(P.CORNER); g.ellipseMode(P.CENTER); g.hint(P.ENABLE_DEPTH_TEST);
+};
+var enter = function(index) {
+    current = index;
+    var scene = scenes[current];
+    var g = canvasFor(scene);
+    g.beginDraw();
+    resetStyle(g);
+    if (scene.renderer == 3) { g.camera(); g.perspective(); }
+    scene.setup(g);
+    g.endDraw();
+    started = P.millis();
+};
+
+var setup = function() {
+    P.size(1280, 720, P.P2D, "AquariusLang · Processing Showcase · 星泉 Processing 展示");
+    P.frameRate(60);
+    flat = P.createGraphics(P.width, P.height, P.P2D);
+    deep = P.createGraphics(P.width, P.height, P.P3D);
+    fitCanvases();
+    font = P.createFont("sans-serif", 18);
+    P.on("keyPressed", function() {
+        if (P.keyCode == P.RIGHT_ARROW) { enter((current + 1) % len(scenes)); }
+        if (P.keyCode == P.LEFT_ARROW) { enter((current + len(scenes) - 1) % len(scenes)); }
+        if (P.keyCode == P.SPACE) { autoplay = !autoplay; }
+        if (P.keyCode == 82) { enter(current); }
+        if (P.keyCode == 83) { saveNext = true; }
+    });
+    P.on("mouseClicked", function() { if (P.mouseButton == P.RIGHT) { enter((current + 1) % len(scenes)); } });
+    enter(0);
+};
+
+var caption = function(scene, t) {
+    # The title card fades in, holds and fades out over the first five seconds of a sketch.
+    var a = P.constrain(P.min(t / 0.6d, (5.0d - t) / 0.8d), 0, 1);
+    P.noStroke();
+    P.fill(0, 0, 0, 120 * a + 50);
+    P.rect(24, P.height - 92, P.max(360, P.textWidth(scene.idea) + 48), 68, 12);
+    P.textFont(font, 22);
+    P.textAlign(P.LEFT, P.TOP);
+    P.fill(255, 255, 255, 140 + 115 * a);
+    P.text(scene.title + "  ·  " + scene.titleZh, 46, P.height - 82);
+    P.textSize(14);
+    P.fill(200, 215, 255, 110 + 120 * a);
+    P.text(scene.idea, 46, P.height - 52);
+    P.textAlign(P.RIGHT, P.TOP);
+    P.fill(255, 255, 255, 90);
+    P.text(P.nf(current + 1, 2) + " / " + P.nf(len(scenes), 2) + "   ← →  ·  Space  ·  R  ·  S", P.width - 24, 20);
+};
+
+var draw = function() {
+    var scene = scenes[current];
+    if (fitCanvases()) { enter(current); }
+    var t = (P.millis() - started) / 1000.0d;
+    if (autoplay && t > SCENE_SECONDS) { enter((current + 1) % len(scenes)); scene = scenes[current]; t = 0.0d; }
+    var g = canvasFor(scene);
+    g.beginDraw();
+    scene.draw(g, t);
+    g.endDraw();
+    P.image(g, 0, 0, P.width, P.height);
+    caption(scene, t);
+    if (saveNext) { saveNext = false; P.saveFrame("showcase-####.png"); }
+};
+
+P.run(setup, draw);

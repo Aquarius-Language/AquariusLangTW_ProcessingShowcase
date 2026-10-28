@@ -1,0 +1,99 @@
+# Abyssal Drifters: glowing creatures made of chained segments swim along noise paths; every segment follows the one
+# ahead at a fixed distance, so the bodies ripple like tentacles. Hold the mouse to lure them. In the spirit of
+# OpenProcessing's tentacle sketches.
+var P = import("Processing");
+var A = import("Array");
+var title = "Abyssal Drifters";
+var titleZh = "深海漂流者";
+var idea = "follow-the-leader chains · 9 creatures × 46 segments";
+var renderer = 2;
+
+var COUNT = 9;
+var SEGMENTS = 46;
+var GAP = 9.0d;
+var W = 0.0d;
+var H = 0.0d;
+var xs = [];
+var ys = [];
+var hues = [];
+var done = 0;
+
+var setup = function(g) {
+    W = g.width * 1.0d;
+    H = g.height * 1.0d;
+    P.randomSeed(9);
+    xs = [];
+    ys = [];
+    hues = [];
+    for (var c = 0; c < COUNT; c++) {
+        var x = P.random(W);
+        var y = P.random(H);
+        var chainX = [];
+        var chainY = [];
+        for (var s = 0; s < SEGMENTS; s++) { A.Append(chainX, x); A.Append(chainY, y + s * GAP); }
+        A.Append(xs, chainX);
+        A.Append(ys, chainY);
+        A.Append(hues, P.random(1));
+    }
+    done = 0;
+};
+
+var step = function(t) {
+    for (var c = 0; c < COUNT; c++) {
+        var cx = xs[c];
+        var cy = ys[c];
+        # The head steers by noise (and towards the mouse while it is held), wrapping around the edges.
+        var heading = P.noise(c * 10.0d, t * 0.25d) * P.TWO_PI * 3;
+        var hx = cx[0] + P.cos(heading) * 2.4d;
+        var hy = cy[0] + P.sin(heading) * 2.4d;
+        if (P.isMousePressed) { hx += (P.mouseX - hx) * 0.02d; hy += (P.mouseY - hy) * 0.02d; }
+        if (hx < -80) { hx += W + 160; }
+        if (hx > W + 80) { hx -= W + 160; }
+        if (hy < -80) { hy += H + 160; }
+        if (hy > H + 80) { hy -= H + 160; }
+        if (P.abs(hx - cx[0]) > 100 || P.abs(hy - cy[0]) > 100) {
+            for (var s = 0; s < SEGMENTS; s++) { cx[s] = hx; cy[s] = hy; }
+        }
+        cx[0] = hx;
+        cy[0] = hy;
+        for (var s = 1; s < SEGMENTS; s++) {
+            var dx = cx[s] - cx[s - 1];
+            var dy = cy[s] - cy[s - 1];
+            var d = P.sqrt(dx * dx + dy * dy) + 0.0001d;
+            # A sideways sway grows towards the tail.
+            var sway = P.sin(t * 6.0d - s * 0.35d + c) * s * 0.012d;
+            cx[s] = cx[s - 1] + dx / d * GAP - dy / d * sway;
+            cy[s] = cy[s - 1] + dy / d * GAP + dx / d * sway;
+        }
+    }
+};
+
+var draw = function(g, t) {
+    var target = int(t * 60);
+    for (var k = done; k < target; k++) { step(k / 60.0d); }
+    done = target;
+    g.noStroke();
+    g.fill(2, 8, 20, 70);
+    g.rect(0, 0, W, H);
+    g.blendMode(P.ADD);
+    g.colorMode(P.HSB, 1.0d);
+    for (var c = 0; c < COUNT; c++) {
+        var cx = xs[c];
+        var cy = ys[c];
+        for (var s = SEGMENTS - 1; s >= 0; s -= 1) {
+            var k = 1.0d - s / (SEGMENTS * 1.0d);
+            var hue = (hues[c] + s * 0.006d + t * 0.03d) % 1.0d;
+            var pulse = 0.5d + 0.5d * P.sin(t * 4.0d - s * 0.4d + c);
+            g.fill(hue, 0.8d, 1.0d, 0.10d + 0.10d * pulse);
+            g.circle(cx[s], cy[s], 6 + 34 * k * k);
+            g.fill(hue, 0.35d, 1.0d, 0.35d + 0.3d * pulse);
+            g.circle(cx[s], cy[s], 2 + 12 * k * k);
+        }
+        # Eyes.
+        g.fill(0, 0, 1.0d, 1.0d);
+        g.circle(cx[0] + (cy[1] - cy[0]) * 0.6d, cy[0] - (cx[1] - cx[0]) * 0.6d, 4);
+        g.circle(cx[0] - (cy[1] - cy[0]) * 0.6d, cy[0] + (cx[1] - cx[0]) * 0.6d, 4);
+    }
+    g.colorMode(P.RGB, 255);
+    g.blendMode(P.BLEND);
+};

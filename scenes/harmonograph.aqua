@@ -1,0 +1,65 @@
+# Harmonograph: four damped pendulums trace a slowly decaying figure line by line, the pen's color drifting through
+# the spectrum; every twelve seconds a new set of frequencies starts a fresh drawing. In the spirit of OpenProcessing's
+# Lissajous and harmonograph sketches.
+var P = import("Processing");
+var title = "Harmonograph";
+var titleZh = "諧波繪圖儀";
+var idea = "four damped pendulums · 2,000 strokes per second";
+var renderer = 2;
+
+var W = 0.0d;
+var H = 0.0d;
+var f = [0.0d, 0.0d, 0.0d, 0.0d];
+var phase = [0.0d, 0.0d, 0.0d, 0.0d];
+var damping = 0.0d;
+var drawing = -1;
+var last = 0.0d;
+
+var setup = function(g) {
+    W = g.width * 1.0d;
+    H = g.height * 1.0d;
+    drawing = -1;
+};
+
+var restart = function(g, index) {
+    P.randomSeed(100 + index * 7);
+    # Near-integer frequency ratios give the classic slowly rotating rosettes.
+    var pairs = [[2.0d, 3.0d], [3.0d, 2.0d], [3.0d, 4.0d], [2.0d, 1.0d], [3.0d, 1.0d]];
+    var pair = pairs[index % 5];
+    f[0] = pair[0] + P.random(-0.006d, 0.006d);
+    f[1] = pair[0] * 1.002d;
+    f[2] = pair[1] + P.random(-0.006d, 0.006d);
+    f[3] = pair[1] * 0.998d;
+    for (var i = 0; i < 4; i++) { phase[i] = P.random(P.TWO_PI); }
+    damping = P.random(0.0012d, 0.0022d);
+    drawing = index;
+    last = 0.0d;
+    g.background(250, 246, 238);
+};
+
+var pen = function(s) {
+    var decay = P.exp(-damping * s);
+    var r = H * 0.23d;
+    var x = r * (P.sin(f[0] * s * 0.05d + phase[0]) + P.sin(f[1] * s * 0.05d + phase[1])) * decay;
+    var y = r * (P.sin(f[2] * s * 0.05d + phase[2]) + P.sin(f[3] * s * 0.05d + phase[3])) * decay;
+    return [W / 2 + x, H / 2 + y];
+};
+
+var draw = function(g, t) {
+    var index = int(t / 12.0d);
+    if (index != drawing) { restart(g, index); }
+    var local = t - index * 12.0d;
+    var upto = local * 2000.0d;
+    g.noFill();
+    g.colorMode(P.HSB, 1.0d);
+    g.strokeWeight(1.7d);
+    var previous = pen(last * 0.1d);
+    for (var s = last; s < upto; s += 1.0d) {
+        var next = pen((s + 1) * 0.1d);
+        g.stroke((drawing * 0.21d + s * 0.00009d) % 1.0d, 0.85d, 0.62d, 0.8d);
+        g.line(previous[0], previous[1], next[0], next[1]);
+        previous = next;
+    }
+    last = P.max(last, P.floor(upto));
+    g.colorMode(P.RGB, 255);
+};

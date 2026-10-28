@@ -1,0 +1,67 @@
+# Truchet Weave: a grid of quarter-circle tiles, the "10 PRINT" idea with arcs, flips tile by tile as waves of noise
+# pass over it, so the knotted paths keep rewiring themselves. In the spirit of OpenProcessing's 10 PRINT sketches.
+var P = import("Processing");
+var A = import("Array");
+var title = "Truchet Weave";
+var titleZh = "特魯謝編織";
+var idea = "quarter-circle tiles · eased flips · rewiring paths";
+var renderer = 2;
+
+var SIZE = 64.0d;
+var W = 0.0d;
+var H = 0.0d;
+var cols = 0;
+var rows = 0;
+var phase = [];
+
+var setup = function(g) {
+    W = g.width * 1.0d;
+    H = g.height * 1.0d;
+    cols = int(W / SIZE) + 2;
+    rows = int(H / SIZE) + 2;
+    P.randomSeed(10);
+    phase = [];
+    for (var i = 0; i < cols * rows; i++) { A.Append(phase, P.random(1)); }
+};
+
+var ease = function(x) {
+    var c = P.constrain(x, 0, 1);
+    return c * c * (3 - 2 * c);
+};
+
+var draw = function(g, t) {
+    g.background(14, 12, 26);
+    g.noFill();
+    g.strokeCap(P.ROUND);
+    g.colorMode(P.HSB, 1.0d);
+    var ox = (W - (cols - 1) * SIZE) / 2;
+    var oy = (H - (rows - 1) * SIZE) / 2;
+    # Two passes: a wide dark casing, then the colored ribbon, so crossings read as woven.
+    for (var pass = 0; pass < 2; pass++) {
+        for (var j = 0; j < rows; j++) {
+            for (var i = 0; i < cols; i++) {
+                var cx = ox + i * SIZE;
+                var cy = oy + j * SIZE;
+                # A diagonal wave decides when the tile turns a quarter; each tile eases through its turn.
+                var wave = t * 0.55d - (i + j) * 0.09d + P.noise(i * 0.2d, j * 0.2d) * 1.5d + phase[j * cols + i] * 0.15d;
+                var turns = P.floor(wave);
+                var angle = (turns + ease((wave - turns - 0.7d) / 0.3d)) * P.HALF_PI;
+                g.pushMatrix();
+                g.translate(cx, cy);
+                g.rotate(angle);
+                if (pass == 0) {
+                    g.strokeWeight(SIZE * 0.34d);
+                    g.stroke(0, 0, 0.05d, 1.0d);
+                } else {
+                    g.strokeWeight(SIZE * 0.2d);
+                    var hue = (0.55d + 0.25d * P.sin((i * 0.11d + j * 0.07d) + t * 0.4d) + 1.0d) % 1.0d;
+                    g.stroke(hue, 0.65d, 0.95d, 1.0d);
+                }
+                g.arc(-SIZE / 2, -SIZE / 2, SIZE, SIZE, 0, P.HALF_PI);
+                g.arc(SIZE / 2, SIZE / 2, SIZE, SIZE, P.PI, P.PI + P.HALF_PI);
+                g.popMatrix();
+            }
+        }
+    }
+    g.colorMode(P.RGB, 255);
+};

@@ -1,0 +1,107 @@
+# Julia Bloom: the Julia set of a parameter c gliding along the main cardioid's edge, computed per pixel by a WGSL
+# fragment shader and colored with a cosine palette; a map in the corner shows c's path. In the spirit of
+# OpenProcessing's fractal and shader sketches.
+var P = import("Processing");
+var title = "Julia Bloom";
+var titleZh = "朱利亞綻放";
+var idea = "WGSL fragment shader · 300 iterations per pixel · smooth coloring";
+var renderer = 2;
+
+var W = 0.0d;
+var H = 0.0d;
+var shader = 0;
+
+var VERTEX = "@vertex fn vs_main(input: VertexInput) -> VertexOutput {
+    var output: VertexOutput;
+    let eye = processing.view * processing.model * vec4<f32>(input.position, 1.0);
+    var clip = processing.projection * eye;
+    clip.z = (clip.z + clip.w) * 0.5;
+    output.position = clip; output.eyePosition = eye.xyz; output.normal = input.normal;
+    output.uv = input.texcoord; output.vertexColor = input.color;
+    return output;
+}";
+
+var FRAGMENT = "struct UserUniforms { time: f32, aspect: f32, zoom: f32, spin: f32, c: vec2<f32>, };
+@group(1) @binding(0) var<uniform> user: UserUniforms;
+fn palette(t: f32) -> vec3<f32> {
+    return vec3<f32>(0.5) + vec3<f32>(0.5) * cos(6.2831853 * (vec3<f32>(1.0, 1.0, 1.0) * t + vec3<f32>(0.0, 0.15, 0.3)));
+}
+@fragment fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
+    let p = (input.uv - vec2<f32>(0.5)) * vec2<f32>(user.aspect, 1.0) * user.zoom;
+    let s = sin(user.spin); let k = cos(user.spin);
+    var z = vec2<f32>(p.x * k - p.y * s, p.x * s + p.y * k);
+    var m = 0.0;
+    var n = 0.0;
+    for (var i = 0; i < 300; i++) {
+        z = vec2<f32>(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + user.c;
+        m = dot(z, z);
+        if (m > 256.0) { break; }
+        n += 1.0;
+    }
+    if (n >= 299.0) {
+        let glow = 0.5 + 0.5 * sin(length(z) * 9.0 + user.time * 2.0);
+        return vec4<f32>(vec3<f32>(0.02, 0.01, 0.05) + vec3<f32>(0.10, 0.03, 0.18) * glow, 1.0);
+    }
+    let smooth_n = n - log2(log2(m)) + 4.0;
+    let color = palette(log(smooth_n + 1.0) * 0.55 + user.time * 0.05);
+    let edge = pow(clamp(smooth_n / 60.0, 0.0, 1.0), 0.45);
+    return vec4<f32>(color * (0.25 + 0.75 * edge), 1.0);
+}";
+
+var setup = function(g) {
+    W = g.width * 1.0d;
+    H = g.height * 1.0d;
+    if (shader == 0) { shader = P.createShader(VERTEX, FRAGMENT); }
+};
+
+# c circles the origin at radius 0.7885, the classic path through connected and dust-like Julia sets.
+var parameter = function(t) {
+    var a = t * 0.21d + 2.1d;
+    return [0.7885d * P.cos(a), 0.7885d * P.sin(a)];
+};
+
+var draw = function(g, t) {
+    var c = parameter(t);
+    shader.set("time", t);
+    shader.set("aspect", W / H);
+    shader.set("zoom", 2.7d - P.sin(t * 0.17d) * 0.5d);
+    shader.set("spin", t * 0.05d);
+    shader.set("c", c[0], c[1]);
+    g.noStroke();
+    g.shader(shader);
+    g.beginShape(P.QUADS);
+    g.vertex(0, 0, 0, 0);
+    g.vertex(W, 0, 1, 0);
+    g.vertex(W, H, 1, 1);
+    g.vertex(0, H, 0, 1);
+    g.endShape();
+    g.resetShader();
+    # The map of c: the cardioid and the path c has travelled.
+    var mx = W - 150;
+    var my = 120.0d;
+    var scale = 70.0d;
+    g.fill(0, 0, 0, 120);
+    g.rect(mx - 110, my - 90, 200, 180, 10);
+    g.noFill();
+    g.stroke(255, 255, 255, 90);
+    g.strokeWeight(1);
+    g.beginShape();
+    for (var i = 0; i <= 90; i++) {
+        # The Mandelbrot set's main cardioid, for reference.
+        var a = i * P.TWO_PI / 90;
+        var r = 0.5d - 0.5d * P.cos(a);
+        g.vertex(mx + (0.25d + r * P.cos(a) ) * scale, my + r * P.sin(a) * scale);
+    }
+    g.endShape();
+    g.stroke(255, 200, 120, 220);
+    g.strokeWeight(2);
+    g.beginShape();
+    for (var i = 0; i <= 40; i++) {
+        var q = parameter(t - 4.0d + i * 0.1d);
+        g.vertex(mx + q[0] * scale, my + q[1] * scale);
+    }
+    g.endShape();
+    g.noStroke();
+    g.fill(255, 220, 140);
+    g.circle(mx + c[0] * scale, my + c[1] * scale, 8);
+};

@@ -1,0 +1,117 @@
+# Constellation Web: drifting nodes link up when they come close, and signals hop along the links as expanding rings.
+# The mouse gathers the nodes. In the spirit of OpenProcessing's network sketches.
+var P = import("Processing");
+var A = import("Array");
+var title = "Constellation Web";
+var titleZh = "星座網絡";
+var idea = "160 nodes · proximity links · signals hopping between stars";
+var renderer = 2;
+
+struct Node { x; y; vx; vy; seed; glow }
+struct Signal { from; to; progress; hue }
+var nodes = [];
+var signals = [];
+var W = 0.0d;
+var H = 0.0d;
+var REACH = 150.0d;
+var done = 0;
+
+var setup = function(g) {
+    W = g.width * 1.0d;
+    H = g.height * 1.0d;
+    P.randomSeed(21);
+    nodes = [];
+    signals = [];
+    done = 0;
+    for (var i = 0; i < 160; i++) { A.Append(nodes, Node(P.random(W), P.random(H), 0.0d, 0.0d, P.random(1000), 0.0d)); }
+};
+
+var step = function(t) {
+    for (var i = 0; i < len(nodes); i++) {
+        var n = nodes[i];
+        var a = P.noise(n.seed, t * 0.15d) * P.TWO_PI * 2;
+        n.vx = n.vx * 0.94d + P.cos(a) * 0.09d;
+        n.vy = n.vy * 0.94d + P.sin(a) * 0.09d;
+        if (P.isMousePressed) {
+            n.vx += (P.mouseX - n.x) * 0.0004d;
+            n.vy += (P.mouseY - n.y) * 0.0004d;
+        }
+        n.x += n.vx;
+        n.y += n.vy;
+        if (n.x < -20) { n.x += W + 40; }
+        if (n.x > W + 20) { n.x -= W + 40; }
+        if (n.y < -20) { n.y += H + 40; }
+        if (n.y > H + 20) { n.y -= H + 40; }
+        n.glow *= 0.95d;
+    }
+    # Signals travel along a link and, on arrival, light the node and move on to one of its neighbours.
+    for (var s = 0; s < len(signals); s++) {
+        var sig = signals[s];
+        sig.progress += 0.035d;
+        if (sig.progress >= 1) {
+            var here = nodes[sig.to];
+            here.glow = 1.0d;
+            var best = -1;
+            var bestScore = 0.0d;
+            for (var j = 0; j < len(nodes); j++) {
+                var d = P.dist(here.x, here.y, nodes[j].x, nodes[j].y);
+                var score = P.random(1);
+                if (j != sig.to && j != sig.from && d < REACH && score > bestScore) { best = j; bestScore = score; }
+            }
+            if (best < 0) { best = int(P.random(len(nodes))); }
+            sig.from = sig.to;
+            sig.to = best;
+            sig.progress = 0.0d;
+        }
+    }
+    if (len(signals) < 14 && P.random(1) < 0.08d) {
+        var start = int(P.random(len(nodes)));
+        A.Append(signals, Signal(start, start, 1.0d, P.random(1)));
+    }
+};
+
+var draw = function(g, t) {
+    var target = int(t * 60);
+    for (var k = done; k < target; k++) { step(k / 60.0d); }
+    done = target;
+    g.background(6, 8, 24);
+    g.colorMode(P.HSB, 1.0d);
+    g.blendMode(P.ADD);
+    for (var i = 0; i < len(nodes); i++) {
+        var a = nodes[i];
+        for (var j = i + 1; j < len(nodes); j++) {
+            var b = nodes[j];
+            var dx = a.x - b.x;
+            var dy = a.y - b.y;
+            var d2 = dx * dx + dy * dy;
+            if (d2 < REACH * REACH) {
+                var strength = 1.0d - P.sqrt(d2) / REACH;
+                g.strokeWeight(0.6d + strength * 1.8d);
+                g.stroke((0.52d + a.x / W * 0.35d) % 1.0d, 0.7d, 1.0d, strength * 0.85d);
+                g.line(a.x, a.y, b.x, b.y);
+            }
+        }
+    }
+    g.noStroke();
+    for (var i = 0; i < len(nodes); i++) {
+        var n = nodes[i];
+        var hue = (0.52d + n.x / W * 0.35d) % 1.0d;
+        g.fill(hue, 0.5d, 1.0d, 0.12d + n.glow * 0.3d);
+        g.circle(n.x, n.y, 14 + n.glow * 40);
+        g.fill(hue, 0.2d, 1.0d, 0.9d);
+        g.circle(n.x, n.y, 3.5d + n.glow * 3);
+    }
+    for (var s = 0; s < len(signals); s++) {
+        var sig = signals[s];
+        var a = nodes[sig.from];
+        var b = nodes[sig.to];
+        var x = P.lerp(a.x, b.x, sig.progress);
+        var y = P.lerp(a.y, b.y, sig.progress);
+        g.fill(sig.hue, 0.6d, 1.0d, 0.35d);
+        g.circle(x, y, 22);
+        g.fill(sig.hue, 0.1d, 1.0d, 1.0d);
+        g.circle(x, y, 6);
+    }
+    g.blendMode(P.BLEND);
+    g.colorMode(P.RGB, 255);
+};
